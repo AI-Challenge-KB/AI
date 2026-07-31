@@ -1,0 +1,37 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Raw and large data
+data/raw/
+data/processed/housing/master/
+data/processed/housing/profiling/
+data/processed/housing/schema/
+
+# Generated outputs
+data/processed/recommendation/demo/
+data/processed/recommendation/scenario_validation/
+data/processed/recommendation/api_response_demo.json
+data/processed/finance/demo/
+
+# Logs
+*.log
+nohup_logs/

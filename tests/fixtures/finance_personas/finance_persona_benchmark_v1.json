@@ -1,0 +1,661 @@
+{
+  "benchmark_version": "finance_persona_benchmark_v1",
+  "evaluation_date": "2026-07-31",
+  "product_ids": {
+    "A": "kb_youth_custom_jeonse",
+    "B": "youth_butimok_jeonse",
+    "C": "youth_butimok_deposit_monthly",
+    "D": "youth_monthly_rent_special_support_2026",
+    "E": "youth_housing_dream_savings"
+  },
+  "persona_count": 18,
+  "personas": [
+    {
+      "persona_id": "P01",
+      "title": "무소득 인턴 대학생",
+      "automation_level": "full_auto",
+      "source_review_status": "clean",
+      "primary_plan_code": "B",
+      "secondary_plan_codes": [
+        "A"
+      ],
+      "forbidden_plan_codes": [
+        "D"
+      ],
+      "expected_primary_product_id": "youth_butimok_jeonse",
+      "expected_forbidden_product_ids": [],
+      "engine_input": {
+        "user": {
+          "birth_date": "2003-01-01",
+          "evaluation_date": "2026-07-31",
+          "household_annual_income_manwon": 0,
+          "housing_funds_manwon": 2400,
+          "is_no_home": true,
+          "all_household_members_no_home": true,
+          "household_head_status": "prospective_household_head",
+          "is_single_household_head": true,
+          "passes_fund_asset_test": true
+        },
+        "property": {
+          "contract_type": "jeonse",
+          "housing_type": "row_house",
+          "deposit_manwon": 12000,
+          "monthly_rent_manwon": 0,
+          "area_m2": 25,
+          "contract_payment_ratio": 0.05,
+          "landlord_type": null,
+          "is_brokered_contract": null
+        }
+      },
+      "missing_engine_features": [],
+      "review_notes": "B와 A가 모두 가능할 때 예상 월 이자가 낮은 B가 우선되어야 함."
+    },
+    {
+      "persona_id": "P02",
+      "title": "중소기업 사회초년생 보증부월세",
+      "automation_level": "full_auto",
+      "source_review_status": "clean",
+      "primary_plan_code": "C",
+      "secondary_plan_codes": [
+        "D"
+      ],
+      "forbidden_plan_codes": [
+        "A"
+      ],
+      "expected_primary_product_id": "youth_butimok_deposit_monthly",
+      "expected_forbidden_product_ids": [],
+      "engine_input": {
+        "user": {
+          "birth_date": "2000-01-01",
+          "evaluation_date": "2026-07-31",
+          "household_annual_income_manwon": 3200,
+          "housing_funds_manwon": 900,
+          "is_no_home": true,
+          "all_household_members_no_home": true,
+          "household_head_status": "household_head",
+          "is_single_household_head": true,
+          "passes_fund_asset_test": true
+        },
+        "property": {
+          "contract_type": "monthly_rent",
+          "housing_type": "officetel",
+          "deposit_manwon": 3000,
+          "monthly_rent_manwon": 60,
+          "area_m2": 25,
+          "contract_payment_ratio": 0.05,
+          "landlord_type": "individual",
+          "is_brokered_contract": true
+        }
+      },
+      "missing_engine_features": [
+        "청년월세지원 병행 추천"
+      ],
+      "review_notes": "C의 보증금대출과 월세대출을 모두 고려해야 함."
+    },
+    {
+      "persona_id": "P03",
+      "title": "대기업 맞벌이 신혼 자산초과",
+      "automation_level": "full_auto",
+      "source_review_status": "clean",
+      "primary_plan_code": "A",
+      "secondary_plan_codes": [
+        "E"
+      ],
+      "forbidden_plan_codes": [
+        "B"
+      ],
+      "expected_primary_product_id": "kb_youth_custom_jeonse",
+      "expected_forbidden_product_ids": [
+        "youth_butimok_jeonse"
+      ],
+      "engine_input": {
+        "user": {
+          "birth_date": "1997-01-01",
+          "evaluation_date": "2026-07-31",
+          "household_annual_income_manwon": 6800,
+          "housing_funds_manwon": 20000,
+          "is_no_home": true,
+          "all_household_members_no_home": true,
+          "household_head_status": "household_head",
+          "is_single_household_head": false,
+          "passes_fund_asset_test": false
+        },
+        "property": {
+          "contract_type": "jeonse",
+          "housing_type": "apartment",
+          "deposit_manwon": 40000,
+          "monthly_rent_manwon": 0,
+          "area_m2": 59.9,
+          "contract_payment_ratio": 0.05,
+          "landlord_type": null,
+          "is_brokered_contract": null
+        }
+      },
+      "missing_engine_features": [
+        "신혼 여부",
+        "청약통장 별도 매칭"
+      ],
+      "review_notes": "B는 자산심사 실패, A는 자산기준이 없어 후보."
+    },
+    {
+      "persona_id": "P04",
+      "title": "공무원 미혼 소득초과",
+      "automation_level": "full_auto",
+      "source_review_status": "internal_conflict",
+      "primary_plan_code": "A",
+      "secondary_plan_codes": [],
+      "forbidden_plan_codes": [
+        "B"
+      ],
+      "expected_primary_product_id": "kb_youth_custom_jeonse",
+      "expected_forbidden_product_ids": [
+        "youth_butimok_jeonse"
+      ],
+      "engine_input": {
+        "user": {
+          "birth_date": "1994-01-01",
+          "evaluation_date": "2026-07-31",
+          "household_annual_income_manwon": 5800,
+          "housing_funds_manwon": 5000,
+          "is_no_home": true,
+          "all_household_members_no_home": true,
+          "household_head_status": "household_head",
+          "is_single_household_head": true,
+          "passes_fund_asset_test": true
+        },
+        "property": {
+          "contract_type": "jeonse",
+          "housing_type": "apartment",
+          "deposit_manwon": 25000,
+          "monthly_rent_manwon": 0,
+          "area_m2": 59,
+          "contract_payment_ratio": 0.05,
+          "landlord_type": null,
+          "is_brokered_contract": null
+        }
+      },
+      "missing_engine_features": [],
+      "review_notes": "요약표는 E를 2안으로 제시하지만 상세 설명은 연소득 5,800만원으로 E 가입 불가라고 설명함."
+    },
+    {
+      "persona_id": "P05",
+      "title": "병역 이행 만 35세 중소기업 재직자",
+      "automation_level": "manual_review",
+      "source_review_status": "ambiguous",
+      "primary_plan_code": "B",
+      "secondary_plan_codes": [
+        "A"
+      ],
+      "forbidden_plan_codes": [],
+      "expected_primary_product_id": null,
+      "expected_forbidden_product_ids": [],
+      "engine_input": null,
+      "missing_engine_features": [
+        "병역기간 연령 차감",
+        "중소기업 재직 조건",
+        "신규 신청과 연장 구분"
+      ],
+      "review_notes": "문서에서도 병역 연장 적용 범위를 은행에서 재확인해야 하는 판단 유보형 사례."
+    },
+    {
+      "persona_id": "P06",
+      "title": "만 24세 지방 소형전세",
+      "automation_level": "full_auto",
+      "source_review_status": "clean",
+      "primary_plan_code": "B",
+      "secondary_plan_codes": [
+        "A"
+      ],
+      "forbidden_plan_codes": [],
+      "expected_primary_product_id": "youth_butimok_jeonse",
+      "expected_forbidden_product_ids": [],
+      "engine_input": {
+        "user": {
+          "birth_date": "2002-01-01",
+          "evaluation_date": "2026-07-31",
+          "household_annual_income_manwon": 2200,
+          "housing_funds_manwon": 1600,
+          "is_no_home": true,
+          "all_household_members_no_home": true,
+          "household_head_status": "household_head",
+          "is_single_household_head": true,
+          "passes_fund_asset_test": true
+        },
+        "property": {
+          "contract_type": "jeonse",
+          "housing_type": "row_house",
+          "deposit_manwon": 8000,
+          "monthly_rent_manwon": 0,
+          "area_m2": 45,
+          "contract_payment_ratio": 0.05,
+          "landlord_type": null,
+          "is_brokered_contract": null
+        }
+      },
+      "missing_engine_features": [
+        "지방 우대금리"
+      ],
+      "review_notes": "만 25세 미만 단독세대주 60㎡·1.2억원 한도 검증."
+    },
+    {
+      "persona_id": "P07",
+      "title": "예비 신혼부부 소득특례",
+      "automation_level": "manual_review",
+      "source_review_status": "internal_conflict",
+      "primary_plan_code": "B",
+      "secondary_plan_codes": [
+        "A"
+      ],
+      "forbidden_plan_codes": [],
+      "expected_primary_product_id": null,
+      "expected_forbidden_product_ids": [],
+      "engine_input": null,
+      "missing_engine_features": [
+        "신혼가구 소득 특례",
+        "예비 신혼 증빙",
+        "신혼가구 보증금 특례"
+      ],
+      "review_notes": "상품 요약의 B 보증금 상한은 3억원이지만 페르소나 보증금은 3억2천만원임. 신혼 특례 보증금 상한 확인 필요."
+    },
+    {
+      "persona_id": "P08",
+      "title": "미성년 자녀 3인 다자녀 가구",
+      "automation_level": "manual_review",
+      "source_review_status": "clean",
+      "primary_plan_code": "B",
+      "secondary_plan_codes": [
+        "A"
+      ],
+      "forbidden_plan_codes": [
+        "C"
+      ],
+      "expected_primary_product_id": null,
+      "expected_forbidden_product_ids": [],
+      "engine_input": null,
+      "missing_engine_features": [
+        "자녀 수",
+        "다자녀 소득 특례",
+        "다자녀 우대금리"
+      ],
+      "review_notes": "현재 엔진은 일반 소득 5천만원 기준만 지원함."
+    },
+    {
+      "persona_id": "P09",
+      "title": "저소득 한부모 보증부월세",
+      "automation_level": "eligibility_only",
+      "source_review_status": "clean",
+      "primary_plan_code": "C",
+      "secondary_plan_codes": [
+        "D"
+      ],
+      "forbidden_plan_codes": [
+        "A"
+      ],
+      "expected_primary_product_id": "youth_butimok_deposit_monthly",
+      "expected_forbidden_product_ids": [],
+      "engine_input": {
+        "user": {
+          "birth_date": "1996-01-01",
+          "evaluation_date": "2026-07-31",
+          "household_annual_income_manwon": 3000,
+          "housing_funds_manwon": 600,
+          "is_no_home": true,
+          "all_household_members_no_home": true,
+          "household_head_status": "household_head",
+          "is_single_household_head": true,
+          "passes_fund_asset_test": true
+        },
+        "property": {
+          "contract_type": "monthly_rent",
+          "housing_type": "row_house",
+          "deposit_manwon": 2000,
+          "monthly_rent_manwon": 45,
+          "area_m2": 30,
+          "contract_payment_ratio": 0.05,
+          "landlord_type": "individual",
+          "is_brokered_contract": true
+        }
+      },
+      "missing_engine_features": [
+        "한부모 여부",
+        "한부모 우대금리",
+        "청년월세지원 병행"
+      ],
+      "review_notes": "C 적격성은 자동 검증 가능하나 우대금리는 검증 불가."
+    },
+    {
+      "persona_id": "P10",
+      "title": "기초생활수급자 지방 보증부월세",
+      "automation_level": "eligibility_only",
+      "source_review_status": "clean",
+      "primary_plan_code": "C",
+      "secondary_plan_codes": [
+        "D"
+      ],
+      "forbidden_plan_codes": [
+        "A"
+      ],
+      "expected_primary_product_id": "youth_butimok_deposit_monthly",
+      "expected_forbidden_product_ids": [],
+      "engine_input": {
+        "user": {
+          "birth_date": "1999-01-01",
+          "evaluation_date": "2026-07-31",
+          "household_annual_income_manwon": 0,
+          "housing_funds_manwon": 150,
+          "is_no_home": true,
+          "all_household_members_no_home": true,
+          "household_head_status": "household_head",
+          "is_single_household_head": true,
+          "passes_fund_asset_test": true
+        },
+        "property": {
+          "contract_type": "monthly_rent",
+          "housing_type": "single_multi_house",
+          "deposit_manwon": 500,
+          "monthly_rent_manwon": 30,
+          "area_m2": 20,
+          "contract_payment_ratio": 0.05,
+          "landlord_type": "individual",
+          "is_brokered_contract": true
+        }
+      },
+      "missing_engine_features": [
+        "기초생활수급자 여부",
+        "수급자 우대금리",
+        "청년월세지원 병행"
+      ],
+      "review_notes": "기본 적격성만 자동 검증하고 우대금리는 수동 검토."
+    },
+    {
+      "persona_id": "P11",
+      "title": "본인 명의 1주택 보유 청년",
+      "automation_level": "full_auto",
+      "source_review_status": "clean",
+      "primary_plan_code": null,
+      "secondary_plan_codes": [],
+      "forbidden_plan_codes": [
+        "A",
+        "B",
+        "C"
+      ],
+      "expected_primary_product_id": null,
+      "expected_forbidden_product_ids": [
+        "kb_youth_custom_jeonse",
+        "youth_butimok_jeonse",
+        "youth_butimok_deposit_monthly"
+      ],
+      "engine_input": {
+        "user": {
+          "birth_date": "1996-01-01",
+          "evaluation_date": "2026-07-31",
+          "household_annual_income_manwon": 4000,
+          "housing_funds_manwon": 3000,
+          "is_no_home": false,
+          "all_household_members_no_home": false,
+          "household_head_status": "household_head",
+          "is_single_household_head": true,
+          "passes_fund_asset_test": true
+        },
+        "property": {
+          "contract_type": "jeonse",
+          "housing_type": "apartment",
+          "deposit_manwon": 10000,
+          "monthly_rent_manwon": 0,
+          "area_m2": 40,
+          "contract_payment_ratio": 0.05,
+          "landlord_type": null,
+          "is_brokered_contract": null
+        }
+      },
+      "missing_engine_features": [],
+      "review_notes": "무주택 여부를 놓치는 오류를 검출하는 함정 사례."
+    },
+    {
+      "persona_id": "P12",
+      "title": "창업지원 수혜 예비창업자",
+      "automation_level": "eligibility_only",
+      "source_review_status": "clean",
+      "primary_plan_code": "B",
+      "secondary_plan_codes": [
+        "A"
+      ],
+      "forbidden_plan_codes": [
+        "C"
+      ],
+      "expected_primary_product_id": "youth_butimok_jeonse",
+      "expected_forbidden_product_ids": [
+        "youth_butimok_deposit_monthly"
+      ],
+      "engine_input": {
+        "user": {
+          "birth_date": "1993-01-01",
+          "evaluation_date": "2026-07-31",
+          "household_annual_income_manwon": 4500,
+          "housing_funds_manwon": 5000,
+          "is_no_home": true,
+          "all_household_members_no_home": true,
+          "household_head_status": "household_head",
+          "is_single_household_head": true,
+          "passes_fund_asset_test": true
+        },
+        "property": {
+          "contract_type": "jeonse",
+          "housing_type": "officetel",
+          "deposit_manwon": 20000,
+          "monthly_rent_manwon": 0,
+          "area_m2": 50,
+          "contract_payment_ratio": 0.05,
+          "landlord_type": null,
+          "is_brokered_contract": null
+        }
+      },
+      "missing_engine_features": [
+        "창업지원기관 보증 여부",
+        "사업소득 산정"
+      ],
+      "review_notes": "기본 B 적격성만 자동 검증."
+    },
+    {
+      "persona_id": "P13",
+      "title": "외국인 임대인 보증부월세",
+      "automation_level": "full_auto",
+      "source_review_status": "ambiguous",
+      "primary_plan_code": "A",
+      "secondary_plan_codes": [],
+      "forbidden_plan_codes": [
+        "C"
+      ],
+      "expected_primary_product_id": "kb_youth_custom_jeonse",
+      "expected_forbidden_product_ids": [
+        "youth_butimok_deposit_monthly"
+      ],
+      "engine_input": {
+        "user": {
+          "birth_date": "1999-01-01",
+          "evaluation_date": "2026-07-31",
+          "household_annual_income_manwon": 3800,
+          "housing_funds_manwon": 1200,
+          "is_no_home": true,
+          "all_household_members_no_home": true,
+          "household_head_status": "household_head",
+          "is_single_household_head": true,
+          "passes_fund_asset_test": true
+        },
+        "property": {
+          "contract_type": "monthly_rent",
+          "housing_type": "officetel",
+          "deposit_manwon": 4000,
+          "monthly_rent_manwon": 65,
+          "area_m2": 30,
+          "contract_payment_ratio": 0.05,
+          "landlord_type": "foreign_individual",
+          "is_brokered_contract": true
+        }
+      },
+      "missing_engine_features": [
+        "A 상품의 전월세전환율 계산"
+      ],
+      "review_notes": "C 외국인 임대인 배제는 자동 검증 가능. A 환산보증금 산식은 추가 구현 필요."
+    },
+    {
+      "persona_id": "P14",
+      "title": "기존 전세대출 대환",
+      "automation_level": "manual_review",
+      "source_review_status": "ambiguous",
+      "primary_plan_code": "A",
+      "secondary_plan_codes": [
+        "B"
+      ],
+      "forbidden_plan_codes": [
+        "C"
+      ],
+      "expected_primary_product_id": null,
+      "expected_forbidden_product_ids": [],
+      "engine_input": null,
+      "missing_engine_features": [
+        "기존 대출 상품",
+        "기존 대출 이용기간",
+        "연체 여부",
+        "잔여 임대차기간",
+        "대환 트랙"
+      ],
+      "review_notes": "대환대출 전용 조건이 현재 엔진에 없음."
+    },
+    {
+      "persona_id": "P15",
+      "title": "LH 공공임대리츠 쉐어하우스",
+      "automation_level": "manual_review",
+      "source_review_status": "clean",
+      "primary_plan_code": "B",
+      "secondary_plan_codes": [
+        "A"
+      ],
+      "forbidden_plan_codes": [
+        "C"
+      ],
+      "expected_primary_product_id": null,
+      "expected_forbidden_product_ids": [],
+      "engine_input": null,
+      "missing_engine_features": [
+        "쉐어하우스 여부",
+        "채권양도 협약기관",
+        "세대주·면적 특례"
+      ],
+      "review_notes": "공공기관 쉐어하우스 특례를 별도 구현해야 함."
+    },
+    {
+      "persona_id": "P16",
+      "title": "만 24세 수도권 대형 오피스텔",
+      "automation_level": "full_auto",
+      "source_review_status": "clean",
+      "primary_plan_code": "A",
+      "secondary_plan_codes": [
+        "E"
+      ],
+      "forbidden_plan_codes": [
+        "B"
+      ],
+      "expected_primary_product_id": "kb_youth_custom_jeonse",
+      "expected_forbidden_product_ids": [
+        "youth_butimok_jeonse"
+      ],
+      "engine_input": {
+        "user": {
+          "birth_date": "2002-01-01",
+          "evaluation_date": "2026-07-31",
+          "household_annual_income_manwon": 4200,
+          "housing_funds_manwon": 15000,
+          "is_no_home": true,
+          "all_household_members_no_home": true,
+          "household_head_status": "household_head",
+          "is_single_household_head": true,
+          "passes_fund_asset_test": true
+        },
+        "property": {
+          "contract_type": "jeonse",
+          "housing_type": "officetel",
+          "deposit_manwon": 35000,
+          "monthly_rent_manwon": 0,
+          "area_m2": 70,
+          "contract_payment_ratio": 0.05,
+          "landlord_type": null,
+          "is_brokered_contract": null
+        }
+      },
+      "missing_engine_features": [
+        "청약통장 별도 매칭"
+      ],
+      "review_notes": "B는 보증금 3억원과 만 25세 미만 면적 60㎡를 모두 초과하므로 부적격이어야 함."
+    },
+    {
+      "persona_id": "P17",
+      "title": "중견기업 재직 갱신계약",
+      "automation_level": "manual_review",
+      "source_review_status": "clean",
+      "primary_plan_code": "B",
+      "secondary_plan_codes": [
+        "A"
+      ],
+      "forbidden_plan_codes": [
+        "D"
+      ],
+      "expected_primary_product_id": null,
+      "expected_forbidden_product_ids": [],
+      "engine_input": null,
+      "missing_engine_features": [
+        "신규·갱신계약 구분",
+        "기존 대출 잔액",
+        "갱신 신청기간",
+        "기한연장 상환조건"
+      ],
+      "review_notes": "현재 엔진은 계약 유형만 보고 갱신 절차를 판단하지 못함."
+    },
+    {
+      "persona_id": "P18",
+      "title": "세대주가 아닌 세대원",
+      "automation_level": "full_auto",
+      "source_review_status": "ambiguous",
+      "primary_plan_code": null,
+      "secondary_plan_codes": [],
+      "forbidden_plan_codes": [
+        "A",
+        "B",
+        "C"
+      ],
+      "expected_primary_product_id": null,
+      "expected_forbidden_product_ids": [
+        "kb_youth_custom_jeonse",
+        "youth_butimok_jeonse",
+        "youth_butimok_deposit_monthly"
+      ],
+      "engine_input": {
+        "user": {
+          "birth_date": "1997-01-01",
+          "evaluation_date": "2026-07-31",
+          "household_annual_income_manwon": 2800,
+          "housing_funds_manwon": 3000,
+          "is_no_home": true,
+          "all_household_members_no_home": true,
+          "household_head_status": "household_member",
+          "is_single_household_head": false,
+          "passes_fund_asset_test": true
+        },
+        "property": {
+          "contract_type": "jeonse",
+          "housing_type": "row_house",
+          "deposit_manwon": 10000,
+          "monthly_rent_manwon": 0,
+          "area_m2": 30,
+          "contract_payment_ratio": 0.05,
+          "landlord_type": null,
+          "is_brokered_contract": null
+        }
+      },
+      "missing_engine_features": [
+        "세대주 전환 예정일"
+      ],
+      "review_notes": "현재 상태에서는 A·B·C 모두 확정 추천되면 안 됨. 세대주 예정자 전환 후 재검토."
+    }
+  ]
+}

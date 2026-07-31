@@ -1,0 +1,15 @@
+﻿field_name,label,stage,currently_collected,required_for
+birth_date,생년월일,pre_match,True,age
+is_no_home,본인 무주택 여부,pre_match,False,all_loans
+all_household_members_no_home,세대원 전원 무주택 여부,pre_match,False,youth_butimok_jeonse
+household_head_status,세대주·예비세대주 여부,pre_match,False,all_loans
+is_single_household_head,단독세대주 여부,pre_match,False,youth_butimok_deposit_monthly
+marital_status,배우자 여부,pre_match,False,household_income
+household_annual_income_manwon,본인·배우자 합산 연소득,pre_match,False,all_loans
+passes_fund_asset_test,주택도시기금 자산심사 충족 여부,detail_check,False,fund_loans
+property_deposit_manwon,매물 보증금,property_check,False,loan_limit
+property_monthly_rent_manwon,매물 월세,property_check,False,monthly_rent_loan
+property_area_m2,매물 전용면적,property_check,False,housing_eligibility
+contract_payment_ratio,지급한 계약금 비율,property_check,False,loan_application
+landlord_type,임대인 유형,property_check,False,youth_butimok_deposit_monthly
+is_brokered_contract,중개업소를 통한 계약 여부,property_check,False,youth_butimok_deposit_monthly

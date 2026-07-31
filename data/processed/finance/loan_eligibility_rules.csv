@@ -1,0 +1,29 @@
+﻿rule_id,product_id,evaluation_stage,field_name,operator,threshold_json,unit,applies_when_json,missing_behavior,description
+kb01_age_min,kb_youth_custom_jeonse,pre_match,age,gte,19,years,{},needs_more_info,만 19세 이상
+kb01_age_max,kb_youth_custom_jeonse,pre_match,age,lte,34,years,{},needs_more_info,만 34세 이하
+kb01_no_home,kb_youth_custom_jeonse,pre_match,is_no_home,eq,true,,{},needs_more_info,무주택 요건
+kb01_head,kb_youth_custom_jeonse,pre_match,household_head_status,in,"[""household_head"", ""prospective_household_head""]",,{},needs_more_info,세대주 또는 예비세대주
+kb01_income,kb_youth_custom_jeonse,pre_match,household_annual_income_manwon,lte,7000,manwon,{},needs_more_info,부부합산 연소득 7천만원 이하
+kb01_deposit,kb_youth_custom_jeonse,property_check,property_deposit_manwon,lte,70000,manwon,{},needs_more_info,수도권 임차보증금 7억원 이하
+kb01_contract_payment,kb_youth_custom_jeonse,property_check,contract_payment_ratio,gte,0.05,ratio,{},needs_more_info,임차보증금의 5% 이상 계약금 지급
+bt01_age_min,youth_butimok_jeonse,pre_match,age,gte,19,years,{},needs_more_info,만 19세 이상
+bt01_age_max,youth_butimok_jeonse,pre_match,age,lte,34,years,{},needs_more_info,표준 연령 조건 만 34세 이하
+bt01_no_home,youth_butimok_jeonse,pre_match,all_household_members_no_home,eq,true,,{},needs_more_info,세대원 전원 무주택
+bt01_head,youth_butimok_jeonse,pre_match,household_head_status,in,"[""household_head"", ""prospective_household_head""]",,{},needs_more_info,세대주 또는 예비세대주
+bt01_income,youth_butimok_jeonse,pre_match,household_annual_income_manwon,lte,5000,manwon,{},needs_more_info,일반 기준 부부합산 연소득 5천만원 이하
+bt01_assets,youth_butimok_jeonse,pre_match,passes_fund_asset_test,eq,true,,{},needs_more_info,주택도시기금 자산심사 통과
+bt01_deposit,youth_butimok_jeonse,property_check,property_deposit_manwon,lte,30000,manwon,{},needs_more_info,임차보증금 3억원 이하
+bt01_area,youth_butimok_jeonse,property_check,property_area_m2,lte,85,m2,{},needs_more_info,일반 기준 임차전용면적 85㎡ 이하
+bt01_area_under25_single,youth_butimok_jeonse,property_check,property_area_m2,lte,60,m2,"{""age_lt"": 25, ""is_single_household_head"": true}",needs_more_info,만 25세 미만 단독세대주는 60㎡ 이하
+bt01_contract_payment,youth_butimok_jeonse,property_check,contract_payment_ratio,gte,0.05,ratio,{},needs_more_info,임차보증금의 5% 이상 계약금 지급
+bt02_age_max,youth_butimok_deposit_monthly,pre_match,age,lte,34,years,{},needs_more_info,만 34세 이하
+bt02_single_head,youth_butimok_deposit_monthly,pre_match,is_single_household_head,eq,true,,{},needs_more_info,단독세대주 또는 단독세대주 예정자
+bt02_no_home,youth_butimok_deposit_monthly,pre_match,is_no_home,eq,true,,{},needs_more_info,무주택 요건
+bt02_income,youth_butimok_deposit_monthly,pre_match,household_annual_income_manwon,lte,5000,manwon,{},needs_more_info,부부합산 연소득 5천만원 이하
+bt02_assets,youth_butimok_deposit_monthly,pre_match,passes_fund_asset_test,eq,true,,{},needs_more_info,주택도시기금 자산심사 통과
+bt02_deposit,youth_butimok_deposit_monthly,property_check,property_deposit_manwon,lte,6500,manwon,{},needs_more_info,임차보증금 6천5백만원 이하
+bt02_rent,youth_butimok_deposit_monthly,property_check,property_monthly_rent_manwon,lte,70,manwon,{},needs_more_info,월세 70만원 이하
+bt02_area,youth_butimok_deposit_monthly,property_check,property_area_m2,lte,60,m2,{},needs_more_info,임차전용면적 60㎡ 이하
+bt02_private_landlord,youth_butimok_deposit_monthly,property_check,landlord_type,eq,"""individual""",,{},needs_more_info,임대인이 개인이어야 함
+bt02_brokered,youth_butimok_deposit_monthly,property_check,is_brokered_contract,eq,true,,{},needs_more_info,부동산 중개업소를 통한 계약 필요
+bt02_contract_payment,youth_butimok_deposit_monthly,property_check,contract_payment_ratio,gte,0.05,ratio,{},needs_more_info,임차보증금의 5% 이상 계약금 지급

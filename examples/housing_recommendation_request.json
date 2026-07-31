@@ -1,0 +1,36 @@
+{
+  "request_id": "demo-user-001",
+  "user_profile": {
+    "birth_date": "2001-03-06",
+    "evaluation_date": "2026-07-31",
+    "monthly_take_home_income_manwon": 280,
+    "household_annual_income_manwon": 3600,
+    "monthly_living_expense_manwon": 110,
+    "monthly_debt_payment_manwon": 0,
+    "target_monthly_savings_manwon": 50,
+    "housing_funds_manwon": 3000,
+    "is_no_home": true,
+    "all_household_members_no_home": true,
+    "household_head_status": "prospective_household_head",
+    "is_single_household_head": true,
+    "passes_fund_asset_test": null
+  },
+  "housing_preference": {
+    "contract_preference": "both",
+    "preferred_housing_types": [
+      "officetel",
+      "row_house"
+    ],
+    "minimum_area_bucket": "20_30",
+    "loan_preference": "minimize",
+    "allowed_district_names": null
+  },
+  "cost_assumptions": {
+    "affordable_monthly_housing_cost_manwon": 72,
+    "moving_initial_cost_manwon": 100,
+    "minimum_cash_reserve_manwon": 300,
+    "management_fee_assumption_manwon": 8,
+    "utilities_assumption_manwon": 7
+  },
+  "top_n": 5
+}

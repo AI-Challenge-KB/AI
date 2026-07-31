@@ -1,0 +1,5 @@
+﻿issue_id,persona_id,severity,issue,required_action
+persona_review_001,P04,high,요약표는 E를 2안으로 제시하지만 상세 카드에서는 연소득 초과로 가입 불가라고 설명함.,E를 2안에서 삭제할지 팀원에게 확인
+persona_review_002,P05,high,A를 2안으로 제시하지만 만 35세 신규 신청 가능 여부가 상세 카드에서 불확실하다고 설명됨.,A의 병역 연장 및 신규 신청 연령 조건 확인
+persona_review_003,P07,high,B의 요약 보증금 상한은 3억원인데 대상 주택은 3억2천만원임.,신혼가구 보증금 특례 상한 확인
+persona_review_004,P13,medium,A의 전월세전환율 적용 방식과 실제 환산보증금 산식이 정리되지 않음.,환산보증금 계산식을 공식 자료에서 확인

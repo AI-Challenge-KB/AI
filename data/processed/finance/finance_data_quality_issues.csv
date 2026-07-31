@@ -1,0 +1,6 @@
+﻿issue_id,severity,subject,issue,handling
+finance_001,high,fund_asset_limit,주택도시기금 자산 기준이 매년 변동되지만 조사자료에 확정 숫자가 없음,자동 적격 판정 대신 needs_more_info 처리 후 공식 자산심사 확인 안내
+finance_002,high,actual_interest_rate,실제 적용금리는 신용·보증·목적물·기준금리에 따라 달라짐,대표금리 기반 예상치라고 표시하고 최종 금리 확정 표현 금지
+finance_003,medium,butimok_exceptions,소득·병역·자녀·신혼·중소기업 관련 예외가 다수 존재,MVP는 일반 기준으로 매칭하고 예외 대상자는 추가 확인 가능성 표시
+finance_004,high,monthly_support_status,청년월세 특별지원은 조사자료 기준 신청기간이 종료됨,현재 월 주거비에서 20만원을 차감하지 않고 신청 종료 상태로 표시
+finance_005,medium,housing_dream_savings,청년 주택드림 청약통장은 현재 전월세 자금 대출이 아님,대출 매칭에서 제외하고 미래 자산 계획에만 사용
