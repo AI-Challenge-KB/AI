@@ -96,31 +96,153 @@ AREA_UPPER_BOUND_M2 = {
 
 
 MINIMUM_AREA_ALLOWED_BUCKETS = {
+    # 면적 상관없음
     "any": [
         "under_20",
         "20_30",
         "30_40",
         "over_40",
     ],
+
+    # 20㎡ 이하만 선택
     "under_20": [
         "under_20",
-        "20_30",
-        "30_40",
-        "over_40",
     ],
+
+    # 최소 20㎡ 이상
     "20_30": [
         "20_30",
         "30_40",
         "over_40",
     ],
+
+    # 최소 30㎡ 이상
     "30_40": [
         "30_40",
         "over_40",
     ],
+
+    # 최소 40㎡ 이상
     "over_40": [
         "over_40",
     ],
 }
+
+FULL_FUNDING_GAP_TOLERANCE_MANWON = 0.01
+
+
+def _safe_float(
+    value: object,
+    default: float = float("inf"),
+) -> float:
+    """숫자 변환에 실패하거나 값이 없으면 기본값을 반환한다."""
+    if value is None:
+        return default
+
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _get_finance_option_annual_rate_pct(
+    option: dict,
+) -> float:
+    """
+    금융상품 후보에서 적용 연이율을 추출한다.
+
+    현재 추천 결과에서는 금리가
+    loan_estimate.applied_annual_rate_pct에 저장된다.
+    일부 중간 객체 구조가 달라도 동작하도록 여러 위치를 확인한다.
+    """
+    direct_rate = option.get("applied_annual_rate_pct")
+
+    loan_estimate = option.get("loan_estimate")
+    if not isinstance(loan_estimate, dict):
+        loan_estimate = {}
+
+    nested_rate = loan_estimate.get(
+        "applied_annual_rate_pct"
+    )
+
+    match = option.get("match")
+    if not isinstance(match, dict):
+        match = {}
+
+    match_loan_estimate = match.get("loan_estimate")
+    if not isinstance(match_loan_estimate, dict):
+        match_loan_estimate = {}
+
+    match_nested_rate = match_loan_estimate.get(
+        "applied_annual_rate_pct"
+    )
+
+    for rate in (
+        direct_rate,
+        nested_rate,
+        match_nested_rate,
+    ):
+        if rate is not None:
+            return _safe_float(rate)
+
+    return float("inf")
+
+
+def _finance_option_sort_key(
+    option: dict,
+) -> tuple:
+    """
+    금융상품 선택 우선순위.
+
+    1. 초기자금 부족분을 전액 충당하는 상품 우선
+    2. 전액 충당 상품끼리는 낮은 금리 우선
+    3. 금리가 같으면 월 이자가 낮은 상품 우선
+    4. 전액 충당 상품이 없으면 남은 부족액이 작은 상품 우선
+    """
+    remaining_gap = max(
+        0.0,
+        _safe_float(
+            option.get("remaining_gap_manwon"),
+            default=0.0,
+        ),
+    )
+
+    annual_rate = (
+        _get_finance_option_annual_rate_pct(option)
+    )
+
+    monthly_interest = _safe_float(
+        option.get("monthly_interest_manwon")
+    )
+
+    product_id = str(
+        option.get("product_id") or ""
+    )
+
+    fully_funded = (
+        remaining_gap
+        <= FULL_FUNDING_GAP_TOLERANCE_MANWON
+    )
+
+    if fully_funded:
+        # 보증금 부족분을 모두 충당할 수 있다면
+        # 낮은 금리부터 선택한다.
+        return (
+            0,
+            annual_rate,
+            monthly_interest,
+            product_id,
+        )
+
+    # 전액 충당 가능한 상품이 없다면
+    # 부족액을 가장 많이 줄여주는 상품을 선택한다.
+    return (
+        1,
+        remaining_gap,
+        annual_rate,
+        monthly_interest,
+        product_id,
+    )
 
 
 CONFIDENCE_SCORE = {
@@ -944,18 +1066,7 @@ class HousingPlanRecommenderV1:
             }
 
         eligible_estimates.sort(
-            key=lambda option: (
-                option[
-                    "remaining_gap_manwon"
-                ],
-                option[
-                    "monthly_interest_manwon"
-                ],
-                STATUS_PRIORITY.get(
-                    option["match_status"],
-                    99,
-                ),
-            )
+            key=_finance_option_sort_key
         )
 
         selected = eligible_estimates[0]

@@ -28,8 +28,52 @@ class HousingPlanRecommenderV12(
         "housing_plan_recommender_v1_2"
     )
 
-    UPFRONT_SHORTFALL_PENALTY = 25.0
+
+    UPFRONT_SHORTFALL_MAX_PENALTY = 25.0
     RESERVE_SHORTFALL_PENALTY = 10.0
+
+    @classmethod
+    def _calculate_upfront_shortfall_penalty(
+        cls,
+        upfront_shortfall_manwon: float,
+        total_upfront_required_manwon: float,
+    ) -> float:
+        """
+        초기자금 부족 비율에 따라 0~25점 페널티를 계산한다.
+
+        예:
+        - 부족 없음: 0점
+        - 필요 자금의 10% 부족: 2.5점
+        - 필요 자금의 50% 부족: 12.5점
+        - 필요 자금의 100% 이상 부족: 25점
+        """
+        shortfall = max(
+            0.0,
+            float(upfront_shortfall_manwon or 0.0),
+        )
+
+        required = max(
+            0.0,
+            float(total_upfront_required_manwon or 0.0),
+        )
+
+        if shortfall <= 0.0:
+            return 0.0
+
+        if required <= 0.0:
+            return cls.UPFRONT_SHORTFALL_MAX_PENALTY
+
+        shortfall_ratio = min(
+            1.0,
+            shortfall / required,
+        )
+
+        penalty = (
+            cls.UPFRONT_SHORTFALL_MAX_PENALTY
+            * shortfall_ratio
+        )
+
+        return round(penalty, 4)
 
     @staticmethod
     def _get_cash_plan(
@@ -531,15 +575,26 @@ class HousingPlanRecommenderV12(
                 or 0.0
             )
 
+            upfront_shortfall_penalty = (
+                self._calculate_upfront_shortfall_penalty(
+                    upfront_shortfall_manwon=(
+                        upfront_cash_shortfall
+                    ),
+                    total_upfront_required_manwon=(
+                        total_upfront_cash_required
+                    ),
+                )
+            )
+
             candidate["score"][
                 "upfront_cash_shortfall_penalty"
-            ] = -self.UPFRONT_SHORTFALL_PENALTY
+            ] = -upfront_shortfall_penalty
 
             candidate["score"]["total"] = round(
                 max(
                     0.0,
                     old_total
-                    - self.UPFRONT_SHORTFALL_PENALTY,
+                    - upfront_shortfall_penalty,
                 ),
                 2,
             )
