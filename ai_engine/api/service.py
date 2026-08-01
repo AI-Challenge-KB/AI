@@ -96,8 +96,12 @@ def build_engine_user(
             preference.minimum_area_bucket
         ),
 
-        "loan_preference": (
+                "loan_preference": (
             preference.loan_preference
+        ),
+
+        "preferred_district_names": (
+            preference.preferred_district_names
         ),
 
         "allowed_district_names": (
@@ -155,6 +159,18 @@ def find_selected_product_url(
 def compact_finance(
     finance: dict[str, Any],
 ) -> dict[str, Any]:
+    available_monthly_rent_financing = (
+        finance.get(
+            "available_monthly_rent_financing_manwon"
+        )
+    )
+
+    estimated_optional_interest = (
+        finance.get(
+            "estimated_monthly_interest_if_used_manwon"
+        )
+    )
+
     return {
         "applied": bool(
             finance.get("applied")
@@ -201,6 +217,26 @@ def compact_finance(
             or 0
         ),
 
+        "available_monthly_rent_financing_manwon": (
+            None
+            if available_monthly_rent_financing is None
+            else float(
+                available_monthly_rent_financing
+            )
+        ),
+
+        "estimated_monthly_interest_if_used_manwon": (
+            None
+            if estimated_optional_interest is None
+            else float(
+                estimated_optional_interest
+            )
+        ),
+
+        "selection_reason": finance.get(
+            "selection_reason"
+        ),
+
         "missing_fields": list(
             finance.get(
                 "missing_fields",
@@ -208,8 +244,10 @@ def compact_finance(
             )
         ),
 
-        "official_url": find_selected_product_url(
-            finance
+        "official_url": (
+            find_selected_product_url(
+                finance
+            )
         ),
 
         "disclaimer": RESULT_DISCLAIMER,
@@ -356,6 +394,12 @@ def compact_candidate(
         ],
 
         "district_name": district_name,
+
+        "district_preference_rank": (
+            candidate.get(
+                "district_preference_rank"
+            )
+        ),
 
         "housing_type": candidate[
             "housing_type"
@@ -521,27 +565,65 @@ def compact_candidate(
 
         "monthly_cost": {
             "monthly_rent_manwon": float(
-                monthly[
-                    "monthly_rent_manwon"
-                ]
+                monthly.get(
+                    "monthly_rent_manwon",
+                    0,
+                )
+                or 0
             ),
 
             "management_fee_manwon": float(
-                monthly[
-                    "management_fee_assumption_manwon"
-                ]
+                monthly.get(
+                    "management_fee_assumption_manwon",
+                    0,
+                )
+                or 0
             ),
 
             "utilities_manwon": float(
-                monthly[
-                    "utilities_assumption_manwon"
-                ]
+                monthly.get(
+                    "utilities_assumption_manwon",
+                    0,
+                )
+                or 0
             ),
 
             "loan_interest_manwon": float(
-                monthly[
-                    "loan_interest_manwon"
-                ]
+                monthly.get(
+                    "loan_interest_manwon",
+                    0,
+                )
+                or 0
+            ),
+
+            "own_cash_deposit_manwon": (
+                monthly.get(
+                    "own_cash_deposit_manwon"
+                )
+            ),
+
+            "deposit_opportunity_cost_manwon": (
+                monthly.get(
+                    "deposit_opportunity_cost_manwon"
+                )
+            ),
+
+            "commute_cost_change_manwon": (
+                monthly.get(
+                    "commute_cost_change_manwon"
+                )
+            ),
+
+            "monthly_support_manwon": (
+                monthly.get(
+                    "monthly_support_manwon"
+                )
+            ),
+
+            "gross_monthly_housing_cost_manwon": (
+                monthly.get(
+                    "gross_monthly_housing_cost_manwon"
+                )
             ),
 
             "total_monthly_housing_cost_manwon": float(
@@ -562,6 +644,13 @@ def compact_candidate(
                 ]
             ),
         },
+
+        "policy_supports": (
+            candidate.get(
+                "policy_supports",
+                [],
+            )
+        ),
 
         "finance": compact_finance(
             candidate["finance"]
