@@ -63,7 +63,7 @@ class UserProfileRequest(StrictModel):
     evaluation_date: date | None = None
 
     monthly_take_home_income_manwon: float = Field(
-        gt=0,
+        ge=0,
         description="월 실수령 소득, 만원 단위",
     )
 
