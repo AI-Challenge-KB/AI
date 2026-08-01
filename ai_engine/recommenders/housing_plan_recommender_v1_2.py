@@ -387,8 +387,10 @@ class HousingPlanRecommenderV12(
         # 이사비와 비상예비금을 제외한 자금만 보증금 자금으로 전달한다.
         adjusted_user = dict(user)
 
+        adjusted_user = dict(user)
+
         adjusted_user[
-            "housing_funds_manwon"
+            "deposit_allocable_cash_manwon"
         ] = cash_plan[
             "deposit_allocable_cash_manwon"
         ]
@@ -681,12 +683,24 @@ class HousingPlanRecommenderV12(
         return candidate
 
     def recommend(
-        self,
-        user: Mapping[str, Any],
-        top_n: int = 5,
+            self,
+            user: Mapping[str, Any],
+            top_n: int = 5,
     ) -> dict[str, Any]:
+        cash_plan = self._get_cash_plan(
+            user
+        )
+
+        adjusted_user = dict(user)
+
+        adjusted_user[
+            "deposit_allocable_cash_manwon"
+        ] = cash_plan[
+            "deposit_allocable_cash_manwon"
+        ]
+
         result = super().recommend(
-            user=user,
+            user=adjusted_user,
             top_n=top_n,
         )
 

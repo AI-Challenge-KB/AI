@@ -10,6 +10,13 @@ from ai_engine.finance.finance_matcher_v1 import (
     FinanceMatcherV1,
 )
 
+from ai_engine.calculators.affordable_budget import (
+    calculate_affordable_housing_budget_manwon,
+)
+
+from ai_engine.calculators.monthly_housing_cost import (
+    calculate_total_monthly_housing_cost_manwon,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -560,20 +567,58 @@ class HousingPlanRecommenderV1:
         )
 
     @staticmethod
-    def _get_affordable_budget(
+    def _get_deposit_allocable_cash(
         user: Mapping[str, Any],
-    ) -> tuple[float, str]:
-        explicit_budget = to_float(
+    ) -> float:
+        """
+        보증금에 실제로 사용할 수 있는 현금을 반환한다.
+
+        deposit_allocable_cash_manwon이 있으면 이를 우선 사용하고,
+        기존 V1 호출과의 하위 호환성을 위해 값이 없을 때만
+        housing_funds_manwon을 사용한다.
+        """
+
+        deposit_allocable_cash = to_float(
             user.get(
-                "affordable_monthly_housing_cost_manwon"
+                "deposit_allocable_cash_manwon"
             )
         )
 
-        if explicit_budget is not None:
-            return (
-                max(explicit_budget, 0.0),
-                "provided_by_affordability_calculator",
+        if deposit_allocable_cash is not None:
+            return max(
+                deposit_allocable_cash,
+                0.0,
             )
+
+        total_housing_funds = (
+            to_float(
+                user.get(
+                    "housing_funds_manwon"
+                ),
+                0.0,
+            )
+            or 0.0
+        )
+
+        return max(
+            total_housing_funds,
+            0.0,
+        )
+
+    @staticmethod
+    def _get_affordable_budget(
+        user: Mapping[str, Any],
+    ) -> tuple[float, str]:
+        """
+        적정 월 주거비를 계산한다.
+
+        적정 주거비 계산의 Single Source of Truth는
+        ai_engine.calculators.affordable_budget 이다.
+
+        외부에서 전달된
+        affordable_monthly_housing_cost_manwon 값은
+        계산에 사용하지 않는다.
+        """
 
         monthly_income = to_float(
             user.get(
@@ -587,6 +632,21 @@ class HousingPlanRecommenderV1:
                     "monthly_income_manwon"
                 )
             )
+
+        if monthly_income is None:
+            raise ValueError(
+                "월 실수령 소득 정보가 필요합니다."
+            )
+
+        additional_income = (
+            to_float(
+                user.get(
+                    "additional_income_manwon"
+                ),
+                0.0,
+            )
+            or 0.0
+        )
 
         living_expense = (
             to_float(
@@ -618,34 +678,68 @@ class HousingPlanRecommenderV1:
             or 0.0
         )
 
-        if monthly_income is None:
-            raise ValueError(
-                "affordable_monthly_housing_cost_manwon 또는 "
-                "월 소득 정보가 필요합니다."
+        emergency_fund_contribution = (
+            to_float(
+                user.get(
+                    "target_emergency_fund_contribution_manwon"
+                ),
+                0.0,
             )
-
-        residual_budget = max(
-            0.0,
-            monthly_income
-            - living_expense
-            - debt_payment
-            - target_savings,
+            or 0.0
         )
 
-        income_ratio_budget = max(
-            0.0,
-            monthly_income * 0.30,
+        savings_preservation_ratio = to_float(
+            user.get(
+                "savings_preservation_ratio"
+            ),
+            1.0,
+        )
+
+        if savings_preservation_ratio is None:
+            savings_preservation_ratio = 1.0
+
+        emergency_preservation_ratio = to_float(
+            user.get(
+                "emergency_fund_preservation_ratio"
+            ),
+            1.0,
+        )
+
+        if emergency_preservation_ratio is None:
+            emergency_preservation_ratio = 1.0
+
+        result = (
+            calculate_affordable_housing_budget_manwon(
+                monthly_income_manwon=monthly_income,
+                additional_income_manwon=(
+                    additional_income
+                ),
+                living_expense_manwon=(
+                    living_expense
+                ),
+                debt_payment_manwon=(
+                    debt_payment
+                ),
+                target_savings_manwon=(
+                    target_savings
+                ),
+                savings_preservation_ratio=(
+                    savings_preservation_ratio
+                ),
+                target_emergency_fund_contribution_manwon=(
+                    emergency_fund_contribution
+                ),
+                emergency_fund_preservation_ratio=(
+                    emergency_preservation_ratio
+                ),
+            )
         )
 
         return (
-            round(
-                min(
-                    residual_budget,
-                    income_ratio_budget,
-                ),
-                2,
-            ),
-            "fallback_min_of_residual_and_30_percent",
+            result[
+                "affordable_housing_budget_manwon"
+            ],
+            "affordable_budget_calculator_ssot",
         )
 
     @staticmethod
@@ -669,6 +763,81 @@ class HousingPlanRecommenderV1:
             dataframe["district_name"].isin(
                 allowed_districts
             )
+        ]
+
+    @staticmethod
+    def _calculate_pre_finance_monthly_cost(
+        transaction_type: str,
+        row: Mapping[str, Any],
+        available_cash: float,
+        management_fee: float,
+        utilities: float,
+    ) -> float:
+        """
+        금융상품을 적용하기 전 rough ranking용
+        월 환산 주거비를 계산한다.
+
+        월 주거비 계산은 최종 후보 평가와 동일하게
+        monthly_housing_cost calculator를 사용한다.
+
+        아직 금융상품이 선택되지 않은 단계이므로
+        대출 원금과 대출이자는 0으로 둔다.
+
+        보증금 기회비용은 전체 보증금이 아니라
+        현재 보증금에 실제 투입 가능한 자기자금에
+        대해서만 계산한다.
+        """
+
+        deposit = (
+            to_float(
+                row.get(
+                    "deposit_median_manwon"
+                ),
+                0.0,
+            )
+            or 0.0
+        )
+
+        if transaction_type == "monthly_rent":
+            monthly_rent = (
+                to_float(
+                    row.get(
+                        "monthly_rent_median_manwon"
+                    ),
+                    0.0,
+                )
+                or 0.0
+            )
+        else:
+            monthly_rent = 0.0
+
+        own_cash_deposit = min(
+            max(deposit, 0.0),
+            max(available_cash, 0.0),
+        )
+
+        result = (
+            calculate_total_monthly_housing_cost_manwon(
+                monthly_rent_manwon=monthly_rent,
+                management_fee_manwon=management_fee,
+                utilities_manwon=utilities,
+
+                # rough ranking 시점에는
+                # 아직 금융상품을 선택하지 않음
+                loan_principal_manwon=0.0,
+                precomputed_loan_interest_manwon=0.0,
+
+                own_cash_deposit_manwon=(
+                    own_cash_deposit
+                ),
+
+                commute_cost_change_manwon=0.0,
+                monthly_support_manwon=0.0,
+            )
+        )
+
+        return result[
+            "net_monthly_cost_manwon"
         ]
 
     def _get_market_candidates(
@@ -745,13 +914,9 @@ class HousingPlanRecommenderV1:
             ]
 
         available_cash = (
-            to_float(
-                user.get(
-                    "housing_funds_manwon"
-                ),
-                0.0,
+            self._get_deposit_allocable_cash(
+                user
             )
-            or 0.0
         )
 
         management_fee = (
@@ -783,24 +948,20 @@ class HousingPlanRecommenderV1:
             - available_cash
         ).clip(lower=0)
 
-        if transaction_type == "monthly_rent":
-            candidates[
-                "_rough_monthly_cost"
-            ] = (
-                candidates[
-                    "monthly_rent_median_manwon"
-                ]
-                + management_fee
-                + utilities
-            )
-
-        else:
-            candidates[
-                "_rough_monthly_cost"
-            ] = (
-                management_fee
-                + utilities
-            )
+        candidates[
+            "_rough_monthly_cost"
+        ] = candidates.apply(
+            lambda row: (
+                self._calculate_pre_finance_monthly_cost(
+                    transaction_type=transaction_type,
+                    row=row,
+                    available_cash=available_cash,
+                    management_fee=management_fee,
+                    utilities=utilities,
+                )
+            ),
+            axis=1,
+        )
 
         budget_denominator = max(
             affordable_budget,
@@ -1342,13 +1503,9 @@ class HousingPlanRecommenderV1:
             monthly_rent = 0.0
 
         available_cash = (
-            to_float(
-                user.get(
-                    "housing_funds_manwon"
-                ),
-                0.0,
+            self._get_deposit_allocable_cash(
+                user
             )
-            or 0.0
         )
 
         management_fee = (
@@ -1442,11 +1599,41 @@ class HousingPlanRecommenderV1:
             or 0.0
         )
 
+        own_cash_deposit = max(
+            0.0,
+            deposit - estimated_loan,
+        )
+
+        monthly_cost_result = (
+            calculate_total_monthly_housing_cost_manwon(
+                monthly_rent_manwon=monthly_rent,
+                management_fee_manwon=management_fee,
+                utilities_manwon=utilities,
+
+                # 대출 자체 정보
+                loan_principal_manwon=estimated_loan,
+
+                # 상품별 이자는 FinanceMatcher가 계산한 값을 사용
+                precomputed_loan_interest_manwon=(
+                    monthly_interest
+                ),
+
+                # 기회비용은 전체 보증금이 아니라
+                # 실제 자기자금 투입분만 계산
+                own_cash_deposit_manwon=(
+                    own_cash_deposit
+                ),
+
+                # 현재 MVP 미구현 값
+                commute_cost_change_manwon=0.0,
+                monthly_support_manwon=0.0,
+            )
+        )
+
         total_monthly_cost = (
-            monthly_rent
-            + management_fee
-            + utilities
-            + monthly_interest
+            monthly_cost_result[
+                "net_monthly_cost_manwon"
+            ]
         )
 
         if affordable_budget > 0:
@@ -1775,6 +1962,30 @@ class HousingPlanRecommenderV1:
                 "total_monthly_housing_cost_manwon": round(
                     total_monthly_cost,
                     2,
+                ),
+                "own_cash_deposit_manwon": round(
+                    own_cash_deposit,
+                    2,
+                ),
+                "deposit_opportunity_cost_manwon": (
+                    monthly_cost_result[
+                        "deposit_opportunity_cost_manwon"
+                    ]
+                ),
+                "commute_cost_change_manwon": (
+                    monthly_cost_result[
+                        "commute_cost_change_manwon"
+                    ]
+                ),
+                "monthly_support_manwon": (
+                    monthly_cost_result[
+                        "monthly_support_manwon"
+                    ]
+                ),
+                "gross_monthly_housing_cost_manwon": (
+                    monthly_cost_result[
+                        "gross_monthly_cost_manwon"
+                    ]
                 ),
                 "affordable_monthly_housing_cost_manwon": round(
                     affordable_budget,

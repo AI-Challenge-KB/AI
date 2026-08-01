@@ -104,11 +104,6 @@ def build_engine_user(
             preference.allowed_district_names
         ),
 
-        "affordable_monthly_housing_cost_manwon": (
-            assumptions
-            .affordable_monthly_housing_cost_manwon
-        ),
-
         "moving_initial_cost_manwon": (
             assumptions.moving_initial_cost_manwon
         ),
