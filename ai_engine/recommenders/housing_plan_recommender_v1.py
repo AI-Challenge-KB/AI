@@ -18,6 +18,10 @@ from ai_engine.calculators.monthly_housing_cost import (
     calculate_total_monthly_housing_cost_manwon,
 )
 
+from ai_engine.policy.policy_support_matcher_v1 import (
+    PolicySupportMatcherV1,
+)
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 MARKET_DATA_DIR = (
@@ -38,6 +42,33 @@ JEONSE_SUMMARY_PATH = (
     / "jeonse_market_summary.csv"
 )
 
+SEOUL_DISTRICT_NAMES = {
+    "강남구",
+    "강동구",
+    "강북구",
+    "강서구",
+    "관악구",
+    "광진구",
+    "구로구",
+    "금천구",
+    "노원구",
+    "도봉구",
+    "동대문구",
+    "동작구",
+    "마포구",
+    "서대문구",
+    "서초구",
+    "성동구",
+    "성북구",
+    "송파구",
+    "양천구",
+    "영등포구",
+    "용산구",
+    "은평구",
+    "종로구",
+    "중구",
+    "중랑구",
+}
 
 CONTRACT_TYPE_ALIASES = {
     "monthly_rent": "monthly_rent",
@@ -201,29 +232,55 @@ def _finance_option_sort_key(
     """
     금융상품 선택 우선순위.
 
-    1. 초기자금 부족분을 전액 충당하는 상품 우선
-    2. 전액 충당 상품끼리는 낮은 금리 우선
-    3. 금리가 같으면 월 이자가 낮은 상품 우선
-    4. 전액 충당 상품이 없으면 남은 부족액이 작은 상품 우선
+    1. likely_eligible 우선
+    2. needs_more_info 후순위
+    3. 같은 eligibility 안에서는 전액 충당 상품 우선
+    4. 전액 충당이 불가능하면 남은 부족액이 작은 상품 우선
+    5. 이후 낮은 금리
+    6. 이후 낮은 월 이자
     """
+
+    match_status = str(
+        option.get(
+            "match_status"
+        )
+        or ""
+    )
+
+    status_priority = (
+        STATUS_PRIORITY.get(
+            match_status,
+            99,
+        )
+    )
+
     remaining_gap = max(
         0.0,
         _safe_float(
-            option.get("remaining_gap_manwon"),
+            option.get(
+                "remaining_gap_manwon"
+            ),
             default=0.0,
         ),
     )
 
     annual_rate = (
-        _get_finance_option_annual_rate_pct(option)
+        _get_finance_option_annual_rate_pct(
+            option
+        )
     )
 
     monthly_interest = _safe_float(
-        option.get("monthly_interest_manwon")
+        option.get(
+            "monthly_interest_manwon"
+        )
     )
 
     product_id = str(
-        option.get("product_id") or ""
+        option.get(
+            "product_id"
+        )
+        or ""
     )
 
     fully_funded = (
@@ -231,26 +288,21 @@ def _finance_option_sort_key(
         <= FULL_FUNDING_GAP_TOLERANCE_MANWON
     )
 
-    if fully_funded:
-        # 보증금 부족분을 모두 충당할 수 있다면
-        # 낮은 금리부터 선택한다.
-        return (
-            0,
-            annual_rate,
-            monthly_interest,
-            product_id,
-        )
-
-    # 전액 충당 가능한 상품이 없다면
-    # 부족액을 가장 많이 줄여주는 상품을 선택한다.
     return (
-        1,
-        remaining_gap,
+        status_priority,
+
+        # 전액 충당이면 0, 아니면 1
+        0 if fully_funded else 1,
+
+        # 전액 충당 상품끼리는 부족액 비교 불필요
+        0.0
+        if fully_funded
+        else remaining_gap,
+
         annual_rate,
         monthly_interest,
         product_id,
     )
-
 
 CONFIDENCE_SCORE = {
     "high": 15.0,
@@ -259,6 +311,11 @@ CONFIDENCE_SCORE = {
     "very_low": 2.0,
 }
 
+DISTRICT_ROUGH_PREFERENCE_PENALTY = {
+    1: 0.0,
+    2: 0.06,
+    None: 0.20,
+}
 
 STATUS_PRIORITY = {
     "likely_eligible": 0,
@@ -363,6 +420,85 @@ def normalize_housing_types(
     return list(dict.fromkeys(normalized_types))
 
 
+def normalize_district_name(
+    value: Any,
+) -> str | None:
+    """
+    서울 자치구 입력을 canonical 구 이름으로 정규화한다.
+
+    예:
+        영등포구
+        서울 영등포구
+        서울시 영등포구
+        서울시영등포구
+        서울특별시 영등포구
+        서울특별시영등포구
+
+        -> 영등포구
+    """
+
+    if is_missing(value):
+        return None
+
+    normalized = str(value).strip()
+
+    normalized = (
+        normalized
+        .replace(" ", "")
+        .replace("\t", "")
+        .replace("\n", "")
+    )
+
+    for prefix in (
+        "서울특별시",
+        "서울시",
+        "서울",
+    ):
+        if normalized.startswith(prefix):
+            normalized = normalized[
+                len(prefix):
+            ]
+            break
+
+    if normalized in SEOUL_DISTRICT_NAMES:
+        return normalized
+
+    return None
+
+def normalize_preferred_district_names(
+    values: Any,
+) -> list[str]:
+    """
+    사용자의 선호 지역 목록을 순서를 유지한 채
+    canonical 서울 자치구 이름으로 정규화한다.
+
+    첫 번째 값은 1순위,
+    두 번째 값은 2순위로 해석한다.
+    """
+
+    if is_missing(values):
+        return []
+
+    if isinstance(values, str):
+        values = [values]
+
+    normalized_districts: list[str] = []
+
+    for value in values:
+        normalized = normalize_district_name(
+            value
+        )
+
+        if normalized is None:
+            continue
+
+        if normalized not in normalized_districts:
+            normalized_districts.append(
+                normalized
+            )
+
+    return normalized_districts[:2]
+
 def round_money(value: Any) -> float | None:
     number = to_float(value)
 
@@ -456,6 +592,15 @@ class HousingPlanRecommenderV1:
                         regex=True,
                     )
                     .str.zfill(5)
+                )
+
+            if "district_name" in dataframe.columns:
+                dataframe[
+                    "_normalized_district_name"
+                ] = dataframe[
+                    "district_name"
+                ].map(
+                    normalize_district_name
                 )
 
         monthly_numeric_columns = [
@@ -565,6 +710,34 @@ class HousingPlanRecommenderV1:
             minimum_area_bucket,
             MINIMUM_AREA_ALLOWED_BUCKETS["any"],
         )
+
+    def _get_policy_support_matcher(
+        self,
+    ) -> PolicySupportMatcherV1:
+        """
+        정책지원 matcher를 반환한다.
+
+        일부 단위테스트가 __init__을 거치지 않고
+        recommender를 생성하는 경우도 있으므로
+        필요할 때 lazy initialization 한다.
+        """
+
+        matcher = getattr(
+            self,
+            "policy_support_matcher",
+            None,
+        )
+
+        if matcher is None:
+            matcher = (
+                PolicySupportMatcherV1()
+            )
+
+            self.policy_support_matcher = (
+                matcher
+            )
+
+        return matcher
 
     @staticmethod
     def _get_deposit_allocable_cash(
@@ -747,6 +920,12 @@ class HousingPlanRecommenderV1:
         dataframe: pd.DataFrame,
         user: Mapping[str, Any],
     ) -> pd.DataFrame:
+        """
+        허용 지역 입력과 시장 데이터의 지역명을
+        모두 서울 자치구 canonical 이름으로 정규화한 뒤
+        필터링한다.
+        """
+
         allowed_districts = user.get(
             "allowed_district_names"
         )
@@ -754,14 +933,54 @@ class HousingPlanRecommenderV1:
         if is_missing(allowed_districts):
             return dataframe
 
-        if isinstance(allowed_districts, str):
+        if isinstance(
+            allowed_districts,
+            str,
+        ):
             allowed_districts = [
                 allowed_districts
             ]
 
+        normalized_districts: list[str] = []
+
+        for district in allowed_districts:
+            normalized = (
+                normalize_district_name(
+                    district
+                )
+            )
+
+            if normalized is not None:
+                normalized_districts.append(
+                    normalized
+                )
+
+        normalized_districts = list(
+            dict.fromkeys(
+                normalized_districts
+            )
+        )
+
+        if not normalized_districts:
+            return dataframe.iloc[0:0]
+
+        if (
+            "_normalized_district_name"
+            in dataframe.columns
+        ):
+            district_series = dataframe[
+                "_normalized_district_name"
+            ]
+        else:
+            district_series = dataframe[
+                "district_name"
+            ].map(
+                normalize_district_name
+            )
+
         return dataframe[
-            dataframe["district_name"].isin(
-                allowed_districts
+            district_series.isin(
+                normalized_districts
             )
         ]
 
@@ -1009,15 +1228,32 @@ class HousingPlanRecommenderV1:
             .fillna(0.6)
         )
 
+        candidates[
+            "_rough_district_preference_penalty"
+        ] = candidates.apply(
+            lambda row: (
+                self._district_preference_penalty(
+                    district_name=row.get(
+                        "district_name"
+                    ),
+                    user=user,
+                )
+            ),
+            axis=1,
+        )
+
         candidates["_rough_rank"] = (
-            candidates[
-                "_rough_budget_distance"
-            ]
-            + candidates[
-                "_rough_deposit_gap_ratio"
-            ]
-            * 0.5
-            + confidence_penalty
+                candidates[
+                    "_rough_budget_distance"
+                ]
+                + candidates[
+                    "_rough_deposit_gap_ratio"
+                ]
+                * 0.5
+                + confidence_penalty
+                + candidates[
+                    "_rough_district_preference_penalty"
+                ]
         )
 
         return (
@@ -1047,8 +1283,24 @@ class HousingPlanRecommenderV1:
 
     @staticmethod
     def _extract_monthly_interest(
-        loan_estimate: Mapping[str, Any],
+            loan_estimate: Mapping[str, Any],
     ) -> float:
+        """
+        현재 추천 비용 시나리오에 실제 적용되는
+        보증금 대출의 월 이자만 반환한다.
+
+        일반 금융상품:
+            estimated_monthly_interest_manwon 사용
+
+        청년전용 버팀목 전월세대출:
+            estimated_monthly_interest_upper_manwon은
+            월세금 대출 이자까지 포함할 수 있으므로
+            그대로 사용하지 않는다.
+
+            대신 실제 적용된 보증금 대출액과
+            deposit_loan_rate_pct를 이용해 계산한다.
+        """
+
         standard_interest = to_float(
             loan_estimate.get(
                 "estimated_monthly_interest_manwon"
@@ -1061,19 +1313,64 @@ class HousingPlanRecommenderV1:
                 0.0,
             )
 
+        deposit_loan = (
+                to_float(
+                    loan_estimate.get(
+                        "estimated_deposit_loan_manwon"
+                    ),
+                    0.0,
+                )
+                or 0.0
+        )
+
+        deposit_rate = to_float(
+            loan_estimate.get(
+                "deposit_loan_rate_pct"
+            )
+        )
+
+        if (
+                deposit_loan > 0
+                and deposit_rate is not None
+        ):
+            monthly_interest = (
+                    deposit_loan
+                    * deposit_rate
+                    / 100
+                    / 12
+            )
+
+            return round(
+                monthly_interest,
+                2,
+            )
+
+        return 0.0
+
+    @staticmethod
+    def _extract_monthly_rent_interest_upper(
+        loan_estimate: Mapping[str, Any],
+    ) -> float:
+        """
+        available 모드에서 안내용으로 사용하는
+        월세 금융 예상 이자 상한을 반환한다.
+
+        실제 추천 비용에는 자동 적용하지 않는다.
+        """
+
         upper_interest = to_float(
             loan_estimate.get(
                 "estimated_monthly_interest_upper_manwon"
             )
         )
 
-        if upper_interest is not None:
-            return max(
-                upper_interest,
-                0.0,
-            )
+        if upper_interest is None:
+            return 0.0
 
-        return 0.0
+        return max(
+            upper_interest,
+            0.0,
+        )
 
     @staticmethod
     def _extract_deposit_loan(
@@ -1104,12 +1401,50 @@ class HousingPlanRecommenderV1:
             or 0.0
         )
 
+    @staticmethod
+    def _extract_monthly_rent_financing(
+        loan_estimate: Mapping[str, Any],
+    ) -> float:
+        """
+        월세금 대출 등 월세 금융상품에서
+        이용 가능한 총 금융금액을 추출한다.
+
+        보증금 대출과는 별개의 값이다.
+        """
+
+        return (
+            to_float(
+                loan_estimate.get(
+                    "estimated_monthly_rent_loan_total_manwon"
+                ),
+                0.0,
+            )
+            or 0.0
+        )
+
     def _select_finance_option(
-        self,
-        user: Mapping[str, Any],
-        property_info: Mapping[str, Any],
-        original_gap: float,
+            self,
+            user: Mapping[str, Any],
+            property_info: Mapping[str, Any],
+            original_gap: float,
     ) -> dict[str, Any]:
+        """
+        사용자 대출 선호에 따라 금융상품을 선택한다.
+
+        no_loan:
+            금융상품을 사용하지 않는다.
+
+        minimize:
+            보증금 부족액이 있을 때만
+            필요한 금융상품을 선택한다.
+
+        available:
+            보증금 부족액이 있으면 금융상품을 선택하고,
+            부족액이 없더라도 이용 가능한 월세 금융상품이
+            있다면 선택 가능한 옵션으로 안내한다.
+            단, 이 경우 실제 주거비 계산에는 적용하지 않는다.
+        """
+
         loan_preference = str(
             user.get(
                 "loan_preference",
@@ -1117,11 +1452,14 @@ class HousingPlanRecommenderV1:
             )
         )
 
-        if (
-            original_gap <= 0
-            or loan_preference == "no_loan"
-            or loan_preference == "대출 없이 추천"
-        ):
+        # -------------------------------------------------
+        # 1. 대출을 원하지 않는 경우
+        # -------------------------------------------------
+
+        if loan_preference in {
+            "no_loan",
+            "대출 없이 추천",
+        }:
             return {
                 "applied": False,
                 "product_id": None,
@@ -1135,17 +1473,62 @@ class HousingPlanRecommenderV1:
                 ),
                 "missing_fields": [],
                 "all_matches": [],
+                "selection_reason": (
+                    "loan_preference_no_loan"
+                ),
             }
+
+        # -------------------------------------------------
+        # 2. 대출 최소화 + 보증금 부족액 없음
+        # -------------------------------------------------
+
+        if (
+                loan_preference == "minimize"
+                and original_gap
+                <= FULL_FUNDING_GAP_TOLERANCE_MANWON
+        ):
+            return {
+                "applied": False,
+                "product_id": None,
+                "product_name": None,
+                "match_status": None,
+                "estimated_loan_manwon": 0.0,
+                "monthly_interest_manwon": 0.0,
+                "remaining_gap_manwon": 0.0,
+                "missing_fields": [],
+                "all_matches": [],
+                "selection_reason": (
+                    "no_finance_needed"
+                ),
+            }
+
+        # -------------------------------------------------
+        # 3. 금융상품 매칭
+        # -------------------------------------------------
 
         matches = self.finance_matcher.match_all(
             user=user,
             property_info=property_info,
         )
 
-        eligible_estimates = []
+        deposit_loan_options: list[
+            dict[str, Any]
+        ] = []
+
+        optional_monthly_rent_options: list[
+            dict[str, Any]
+        ] = []
 
         for match in matches:
-            if match["match_status"] == "ineligible":
+            match_status = str(
+                match.get(
+                    "match_status"
+                )
+                or ""
+            )
+
+            # 명확하게 부적격인 상품은 제외
+            if match_status == "ineligible":
                 continue
 
             estimate = match.get(
@@ -1153,25 +1536,40 @@ class HousingPlanRecommenderV1:
                 {},
             )
 
-            if (
-                estimate.get(
-                    "calculation_status"
-                )
-                != "estimated"
+            if not isinstance(
+                    estimate,
+                    Mapping,
             ):
                 continue
 
-            estimated_loan = (
+            if (
+                    estimate.get(
+                        "calculation_status"
+                    )
+                    != "estimated"
+            ):
+                continue
+
+            estimated_deposit_loan = (
                 self._extract_deposit_loan(
                     estimate
                 )
             )
 
-            if estimated_loan <= 0:
-                continue
+            monthly_rent_financing = (
+                self._extract_monthly_rent_financing(
+                    estimate
+                )
+            )
 
-            monthly_interest = (
+            deposit_monthly_interest = (
                 self._extract_monthly_interest(
+                    estimate
+                )
+            )
+
+            monthly_rent_interest_upper = (
+                self._extract_monthly_rent_interest_upper(
                     estimate
                 )
             )
@@ -1183,60 +1581,297 @@ class HousingPlanRecommenderV1:
                 )
             )
 
-            eligible_estimates.append(
-                {
-                    "product_id": match[
-                        "product_id"
-                    ],
-                    "product_name": match[
-                        "product_name"
-                    ],
-                    "match_status": match[
-                        "match_status"
-                    ],
-                    "estimated_loan_manwon": (
-                        estimated_loan
-                    ),
-                    "monthly_interest_manwon": (
-                        monthly_interest
-                    ),
-                    "remaining_gap_manwon": (
-                        remaining_gap
-                    ),
-                    "missing_fields": match[
-                        "missing_fields"
-                    ],
-                    "loan_estimate": estimate,
-                }
-            )
-
-        if not eligible_estimates:
-            return {
-                "applied": False,
-                "product_id": None,
-                "product_name": None,
-                "match_status": None,
-                "estimated_loan_manwon": 0.0,
-                "monthly_interest_manwon": 0.0,
-                "remaining_gap_manwon": round(
-                    original_gap,
-                    2,
+            common_option = {
+                "product_id": match.get(
+                    "product_id"
                 ),
-                "missing_fields": [],
-                "all_matches": matches,
+                "product_name": match.get(
+                    "product_name"
+                ),
+                "match_status": (
+                    match_status
+                ),
+                "missing_fields": (
+                    match.get(
+                        "missing_fields",
+                        [],
+                    )
+                ),
+                "loan_estimate": estimate,
             }
 
-        eligible_estimates.sort(
-            key=_finance_option_sort_key
-        )
+            # ---------------------------------------------
+            # 보증금 대출 후보
+            # ---------------------------------------------
 
-        selected = eligible_estimates[0]
+            if estimated_deposit_loan > 0:
+                deposit_loan_options.append(
+                    {
+                        **common_option,
+                        "estimated_loan_manwon": (
+                            estimated_deposit_loan
+                        ),
+                        "monthly_interest_manwon": (
+                            deposit_monthly_interest
+                        ),
+                        "remaining_gap_manwon": (
+                            remaining_gap
+                        ),
+                    }
+                )
+
+            # ---------------------------------------------
+            # available 모드:
+            # 보증금 부족이 없어도 월세 금융상품 안내
+            # ---------------------------------------------
+
+            if (
+                    loan_preference
+                    == "available"
+                    and original_gap
+                    <= FULL_FUNDING_GAP_TOLERANCE_MANWON
+                    and monthly_rent_financing > 0
+            ):
+                optional_monthly_rent_options.append(
+                    {
+                        **common_option,
+
+                        # 실제 비용계산에는 적용하지 않음
+                        "estimated_loan_manwon": 0.0,
+                        "monthly_interest_manwon": 0.0,
+                        "remaining_gap_manwon": 0.0,
+
+                        # 안내용 정보
+                        "available_monthly_rent_financing_manwon": (
+                            monthly_rent_financing
+                        ),
+                        "estimated_monthly_interest_if_used_manwon": (
+                            monthly_rent_interest_upper
+                        ),
+                    }
+                )
+
+        # -------------------------------------------------
+        # 4. 보증금 부족이 있고 사용할 대출 후보가 있는 경우
+        # -------------------------------------------------
+
+        if (
+                original_gap
+                > FULL_FUNDING_GAP_TOLERANCE_MANWON
+                and deposit_loan_options
+        ):
+            deposit_loan_options.sort(
+                key=_finance_option_sort_key
+            )
+
+            selected = (
+                deposit_loan_options[0]
+            )
+
+            return {
+                "applied": True,
+                **selected,
+                "all_matches": matches,
+                "selection_reason": (
+                    "deposit_gap_financing"
+                ),
+            }
+
+        # -------------------------------------------------
+        # 5. available + 보증금 부족 없음
+        #    선택 가능한 월세 금융상품 안내
+        # -------------------------------------------------
+
+        if (
+                loan_preference
+                == "available"
+                and optional_monthly_rent_options
+        ):
+            optional_monthly_rent_options.sort(
+                key=lambda option: (
+                    STATUS_PRIORITY.get(
+                        str(
+                            option.get(
+                                "match_status"
+                            )
+                            or ""
+                        ),
+                        99,
+                    ),
+                    _safe_float(
+                        option.get(
+                            "estimated_monthly_interest_if_used_manwon"
+                        )
+                    ),
+                    str(
+                        option.get(
+                            "product_id"
+                        )
+                        or ""
+                    ),
+                )
+            )
+
+            selected = (
+                optional_monthly_rent_options[
+                    0
+                ]
+            )
+
+            return {
+                "applied": False,
+                **selected,
+                "all_matches": matches,
+                "selection_reason": (
+                    "optional_monthly_rent_financing_available"
+                ),
+            }
+
+        # -------------------------------------------------
+        # 6. 사용 가능한 상품 없음
+        # -------------------------------------------------
 
         return {
-            "applied": True,
-            **selected,
+            "applied": False,
+            "product_id": None,
+            "product_name": None,
+            "match_status": None,
+            "estimated_loan_manwon": 0.0,
+            "monthly_interest_manwon": 0.0,
+            "remaining_gap_manwon": round(
+                max(
+                    original_gap,
+                    0.0,
+                ),
+                2,
+            ),
+            "missing_fields": [],
             "all_matches": matches,
+            "selection_reason": (
+                "no_matching_finance_product"
+            ),
         }
+
+    @staticmethod
+    def _district_preference_score(
+        district_name: Any,
+        user: Mapping[str, Any],
+    ) -> tuple[float, int | None]:
+        """
+        선호 지역 순위에 따른 점수를 반환한다.
+
+        1순위: 10점
+        2순위: 7점
+        그 외: 0점
+
+        선호지역 입력이 아예 없는 경우에는
+        기존 점수 체계를 유지하기 위해 10점을 반환한다.
+        """
+
+        preferred_districts = (
+            normalize_preferred_district_names(
+                user.get(
+                    "preferred_district_names"
+                )
+            )
+        )
+
+        if not preferred_districts:
+            return 10.0, None
+
+        normalized_district = (
+            normalize_district_name(
+                district_name
+            )
+        )
+
+        if normalized_district is None:
+            return 0.0, None
+
+        if (
+            len(preferred_districts) >= 1
+            and normalized_district
+            == preferred_districts[0]
+        ):
+            return 10.0, 1
+
+        if (
+            len(preferred_districts) >= 2
+            and normalized_district
+            == preferred_districts[1]
+        ):
+            return 7.0, 2
+
+        return 0.0, None
+
+    @staticmethod
+    def _district_preference_penalty(
+        district_name: Any,
+        user: Mapping[str, Any],
+    ) -> float:
+        """
+        rough ranking 단계에서 사용하는
+        지역 선호 penalty.
+
+        1순위: 0.00
+        2순위: 0.06
+        선호지역 외: 0.20
+
+        선호지역 입력이 없는 경우에는
+        모든 지역을 동일하게 취급한다.
+        """
+
+        preferred_districts = (
+            normalize_preferred_district_names(
+                user.get(
+                    "preferred_district_names"
+                )
+            )
+        )
+
+        if not preferred_districts:
+            return 0.0
+
+        normalized_district = (
+            normalize_district_name(
+                district_name
+            )
+        )
+
+        if normalized_district is None:
+            return (
+                DISTRICT_ROUGH_PREFERENCE_PENALTY[
+                    None
+                ]
+            )
+
+        if (
+            len(preferred_districts) >= 1
+            and normalized_district
+            == preferred_districts[0]
+        ):
+            return (
+                DISTRICT_ROUGH_PREFERENCE_PENALTY[
+                    1
+                ]
+            )
+
+        if (
+            len(preferred_districts) >= 2
+            and normalized_district
+            == preferred_districts[1]
+        ):
+            return (
+                DISTRICT_ROUGH_PREFERENCE_PENALTY[
+                    2
+                ]
+            )
+
+        return (
+            DISTRICT_ROUGH_PREFERENCE_PENALTY[
+                None
+            ]
+        )
 
     @staticmethod
     def _affordability_score(
@@ -1472,6 +2107,234 @@ class HousingPlanRecommenderV1:
             ),
         }
 
+    @staticmethod
+    def _calculate_finance_stress_test(
+        finance: Mapping[str, Any],
+        monthly_cost_result: Mapping[str, Any],
+        monthly_rent: float,
+        management_fee: float,
+        utilities: float,
+        own_cash_deposit: float,
+        interest_rate_increase_pct_point: float = 2.0,
+    ) -> dict[str, Any]:
+        """
+        현재 비용 시나리오에 실제 적용된 보증금 대출에 대해
+        금리 상승 stress test를 수행한다.
+
+        available 모드에서 안내만 하는 선택형 월세 금융상품은
+        현재 비용 시나리오에 적용되지 않았으므로
+        stress test 대상에서 제외한다.
+
+        C 상품처럼 월세금 대출이 별도 구조인 경우에도
+        실제 적용된 보증금 대출 원금만 +2%p 스트레스한다.
+        """
+
+        base_total_monthly_cost = (
+            to_float(
+                monthly_cost_result.get(
+                    "net_monthly_cost_manwon"
+                ),
+                0.0,
+            )
+            or 0.0
+        )
+
+        base_loan_interest = (
+            to_float(
+                monthly_cost_result.get(
+                    "loan_interest_manwon"
+                ),
+                0.0,
+            )
+            or 0.0
+        )
+
+        applied = bool(
+            finance.get(
+                "applied"
+            )
+        )
+
+        estimated_loan = (
+            to_float(
+                finance.get(
+                    "estimated_loan_manwon"
+                ),
+                0.0,
+            )
+            or 0.0
+        )
+
+        # 현재 비용 시나리오에 대출이 실제 적용되지 않았다면
+        # 금리 스트레스도 적용하지 않는다.
+        if (
+            not applied
+            or estimated_loan <= 0
+        ):
+            return {
+                "interest_rate_increase_pct_point": (
+                    interest_rate_increase_pct_point
+                ),
+                "base_loan_interest_manwon": round(
+                    base_loan_interest,
+                    2,
+                ),
+                "additional_monthly_interest_manwon": 0.0,
+                "stressed_loan_interest_manwon": round(
+                    base_loan_interest,
+                    2,
+                ),
+                "stressed_total_monthly_cost_manwon": round(
+                    base_total_monthly_cost,
+                    2,
+                ),
+                "stress_scope": (
+                    "no_applied_finance"
+                ),
+                "calculation_note": (
+                    "현재 비용 시나리오에 실제 적용된 "
+                    "주거대출이 없어 금리 스트레스를 "
+                    "적용하지 않았습니다."
+                ),
+            }
+
+        additional_interest = (
+            estimated_loan
+            * interest_rate_increase_pct_point
+            / 100
+            / 12
+        )
+
+        additional_interest = round(
+            additional_interest,
+            2,
+        )
+
+        stressed_loan_interest = round(
+            base_loan_interest
+            + additional_interest,
+            2,
+        )
+
+        stressed_cost_result = (
+            calculate_total_monthly_housing_cost_manwon(
+                monthly_rent_manwon=monthly_rent,
+                management_fee_manwon=management_fee,
+                utilities_manwon=utilities,
+
+                loan_principal_manwon=estimated_loan,
+
+                # 기존 상품별 계산 이자에
+                # 금리 상승분만 추가한다.
+                precomputed_loan_interest_manwon=(
+                    stressed_loan_interest
+                ),
+
+                own_cash_deposit_manwon=(
+                    own_cash_deposit
+                ),
+
+                commute_cost_change_manwon=(
+                    to_float(
+                        monthly_cost_result.get(
+                            "commute_cost_change_manwon"
+                        ),
+                        0.0,
+                    )
+                    or 0.0
+                ),
+
+                monthly_support_manwon=(
+                    to_float(
+                        monthly_cost_result.get(
+                            "monthly_support_manwon"
+                        ),
+                        0.0,
+                    )
+                    or 0.0
+                ),
+            )
+        )
+
+        loan_estimate = finance.get(
+            "loan_estimate",
+            {},
+        )
+
+        if not isinstance(
+            loan_estimate,
+            Mapping,
+        ):
+            loan_estimate = {}
+
+        has_monthly_rent_financing = (
+            (
+                to_float(
+                    loan_estimate.get(
+                        "estimated_monthly_rent_loan_total_manwon"
+                    ),
+                    0.0,
+                )
+                or 0.0
+            )
+            > 0
+        )
+
+        if has_monthly_rent_financing:
+            stress_scope = (
+                "applied_deposit_loan_only_"
+                "monthly_rent_drawdown_excluded"
+            )
+
+            calculation_note = (
+                "실제 비용 시나리오에 적용된 보증금 대출 원금에만 "
+                f"금리 +{interest_rate_increase_pct_point:.1f}%p를 "
+                "적용했습니다. 월세금 대출은 월별 실행액과 "
+                "잔액이 달라질 수 있어 스트레스 계산에서 제외했습니다."
+            )
+
+        else:
+            stress_scope = (
+                "applied_deposit_loan"
+            )
+
+            calculation_note = (
+                "현재 비용 시나리오에 적용된 보증금 대출 원금에 "
+                f"금리 +{interest_rate_increase_pct_point:.1f}%p를 "
+                "적용해 월 주거비를 다시 계산했습니다."
+            )
+
+        return {
+            "interest_rate_increase_pct_point": (
+                interest_rate_increase_pct_point
+            ),
+
+            "base_loan_interest_manwon": round(
+                base_loan_interest,
+                2,
+            ),
+
+            "additional_monthly_interest_manwon": (
+                additional_interest
+            ),
+
+            "stressed_loan_interest_manwon": (
+                stressed_loan_interest
+            ),
+
+            "stressed_total_monthly_cost_manwon": (
+                stressed_cost_result[
+                    "net_monthly_cost_manwon"
+                ]
+            ),
+
+            "stress_scope": stress_scope,
+
+            "calculation_note": (
+                calculation_note
+            ),
+        }
+
     def _build_candidate(
         self,
         transaction_type: str,
@@ -1562,6 +2425,15 @@ class HousingPlanRecommenderV1:
             "landlord_type": None,
             "is_brokered_contract": None,
         }
+
+        policy_supports = (
+            self._get_policy_support_matcher()
+            .match_all(
+                user=user,
+                property_info=property_info,
+            )
+        )
+
 
         finance = self._select_finance_option(
             user=user,
@@ -1660,7 +2532,15 @@ class HousingPlanRecommenderV1:
             )
         )
 
-        preference_score = 10.0
+        (
+            preference_score,
+            district_preference_rank,
+        ) = self._district_preference_score(
+            district_name=row.get(
+                "district_name"
+            ),
+            user=user,
+        )
 
         confidence = str(
             row.get(
@@ -1703,20 +2583,20 @@ class HousingPlanRecommenderV1:
             remaining_gap=remaining_gap,
         )
 
-        stress_rate_increase_pct = 2.0
-
-        stress_additional_interest = round(
-            estimated_loan
-            * stress_rate_increase_pct
-            / 100
-            / 12,
-            2,
-        )
-
-        stress_monthly_cost = round(
-            total_monthly_cost
-            + stress_additional_interest,
-            2,
+        stress_test = (
+            self._calculate_finance_stress_test(
+                finance=finance,
+                monthly_cost_result=(
+                    monthly_cost_result
+                ),
+                monthly_rent=monthly_rent,
+                management_fee=management_fee,
+                utilities=utilities,
+                own_cash_deposit=(
+                    own_cash_deposit
+                ),
+                interest_rate_increase_pct_point=2.0,
+            )
         )
 
         future_simulation = (
@@ -1798,22 +2678,61 @@ class HousingPlanRecommenderV1:
 
         if finance["applied"]:
             finance_text = (
-                f"{finance['product_name']} 사전 매칭 결과를 적용하면 "
-                f"예상 대출액은 {estimated_loan:,.0f}만원, "
-                f"예상 월 이자는 {monthly_interest:.1f}만원입니다. "
+                f"{finance['product_name']} "
+                f"사전 매칭 결과를 적용하면 "
+                f"예상 대출액은 "
+                f"{estimated_loan:,.0f}만원, "
+                f"예상 월 이자는 "
+                f"{monthly_interest:.1f}만원입니다. "
                 f"최종 승인 여부는 별도 심사가 필요합니다."
+            )
+
+        elif (
+                finance.get(
+                    "selection_reason"
+                )
+                == "optional_monthly_rent_financing_available"
+        ):
+            optional_amount = (
+                    to_float(
+                        finance.get(
+                            "available_monthly_rent_financing_manwon"
+                        ),
+                        0.0,
+                    )
+                    or 0.0
+            )
+
+            optional_interest = (
+                    to_float(
+                        finance.get(
+                            "estimated_monthly_interest_if_used_manwon"
+                        ),
+                        0.0,
+                    )
+                    or 0.0
+            )
+
+            finance_text = (
+                f"현재 보증금은 보유 자금으로 마련 가능하지만, "
+                f"{finance['product_name']}을 통해 "
+                f"최대 약 {optional_amount:,.0f}만원의 "
+                f"월세 금융을 이용할 수 있습니다. "
+                f"이용 시 예상 월 이자는 최대 "
+                f"{optional_interest:.1f}만원 수준이며, "
+                f"현재 추천 비용 계산에는 적용하지 않았습니다."
             )
 
         elif initial_gap <= 0:
             finance_text = (
                 "현재 보유 자금으로 보증금 마련이 가능해 "
-                "대출을 적용하지 않았습니다."
+                "금융상품을 적용하지 않았습니다."
             )
 
         else:
             finance_text = (
-                "현재 입력 조건에서 적용 가능한 대출을 확정하지 못해 "
-                "금융상품 추가 확인이 필요합니다."
+                "현재 입력 조건에서 적용 가능한 금융상품을 "
+                "확정하지 못해 추가 확인이 필요합니다."
             )
 
         return {
@@ -1833,6 +2752,9 @@ class HousingPlanRecommenderV1:
                 )
             ),
             "district_name": district_name,
+            "district_preference_rank": (
+                district_preference_rank
+            ),
             "housing_type": housing_type,
             "housing_type_label": (
                 HOUSING_TYPE_LABELS.get(
@@ -1996,18 +2918,17 @@ class HousingPlanRecommenderV1:
                     4,
                 ),
             },
+
+            "policy_supports": (
+                policy_supports
+            ),
+
             "finance": finance,
-            "stress_test": {
-                "interest_rate_increase_pct_point": (
-                    stress_rate_increase_pct
-                ),
-                "additional_monthly_interest_manwon": (
-                    stress_additional_interest
-                ),
-                "stressed_total_monthly_cost_manwon": (
-                    stress_monthly_cost
-                ),
-            },
+
+            "stress_test": (
+                stress_test
+            ),
+
             "future_simulation": (
                 future_simulation
             ),
@@ -2037,6 +2958,19 @@ class HousingPlanRecommenderV1:
                 "affordability": (
                     affordability_text
                 ),
+                "district_preference": (
+                    (
+                        f"{district_name}은 "
+                        f"사용자의 {district_preference_rank}순위 "
+                        f"선호 지역입니다."
+                    )
+                    if district_preference_rank
+                       is not None
+                    else (
+                        "선호 지역 순위가 지정되지 않았거나 "
+                        "해당 후보가 선호 지역 외 지역입니다."
+                    )
+                ),
                 "market_basis": (
                     f"{district_name} "
                     f"{HOUSING_TYPE_LABELS.get(housing_type, housing_type)} "
@@ -2048,9 +2982,9 @@ class HousingPlanRecommenderV1:
                 ),
                 "finance": finance_text,
                 "stress_test": (
-                    f"적용 대출금리가 2%p 상승하면 "
-                    f"예상 월 주거비가 "
-                    f"{stress_additional_interest:.1f}만원 증가합니다."
+                    stress_test[
+                        "calculation_note"
+                    ]
                 ),
                 "final_judgement": (
                     judgement_label
@@ -2242,6 +3176,13 @@ class HousingPlanRecommenderV1:
                 "loan_preference": (
                     user.get(
                         "loan_preference"
+                    )
+                ),
+                "preferred_district_names": (
+                    normalize_preferred_district_names(
+                        user.get(
+                            "preferred_district_names"
+                        )
                     )
                 ),
                 "allowed_district_names": (
